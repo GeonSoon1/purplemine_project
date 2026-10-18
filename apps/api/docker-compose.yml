@@ -1,0 +1,23 @@
+# 로컬 개발용 PostgreSQL + pgvector.  사용: npm run db:up
+# 호스트 포트 기본 5433 (로컬에 이미 5432를 쓰는 postgres가 있는 경우가 많아서). DB_PORT 로 변경.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: purplemine-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-purplemine}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-purplemine}
+      POSTGRES_DB: ${DB_NAME:-purplemine}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - purplemine-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-purplemine} -d ${DB_NAME:-purplemine}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  purplemine-pgdata:
