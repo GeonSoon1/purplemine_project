@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { mkdtempSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import JSZip from 'jszip';
 import { Client } from 'pg';
 import request from 'supertest';
 import { startMockLlm, MockLlm } from './mock-llm-server';
@@ -196,6 +197,33 @@ describe('API e2e', () => {
     const empty = await upload('   ');
     expect(empty.status).toBe(400);
     // 실패한 업로드가 파일을 남기지 않는다
+    expect(readdirSync(storageDir)).toHaveLength(0);
+  });
+
+  t('hwpx 업로드: 본문을 추출해 분석에 넘기고, 구버전 hwp 는 415', async () => {
+    const paras = ['S#1. 서울 도심 / 낮', '검은색 제네시스 G90이 도착한다.'];
+    const zip = new JSZip();
+    zip.file(
+      'Contents/section0.xml',
+      `<hs:sec>${paras.map((p) => `<hp:p><hp:run><hp:t>${p}</hp:t></hp:run></hp:p>`).join('')}</hs:sec>`,
+    );
+    const buf = await zip.generateAsync({ type: 'nodebuffer' });
+    const res = await http
+      .post('/api/scripts')
+      .field('title', '한글 대본')
+      .field('productionCompany', '한빛스튜디오')
+      .attach('file', buf, { filename: '마지막 배달.hwpx' });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual(expect.objectContaining({ fileType: 'hwpx', fileName: '마지막 배달.hwpx' }));
+    await waitStatus(res.body.id, ['ANALYZED']);
+    expect(llm.calls.at(-1)?.textLength).toBe(paras.join('\n').length);
+    expect((await http.delete(`/api/scripts/${res.body.id}`)).status).toBe(204);
+
+    const hwp = await http.post('/api/scripts').field('title', 'a').field('productionCompany', 'b').attach('file', Buffer.from('x'), { filename: 'a.hwp' });
+    expect(hwp.status).toBe(415);
+    // 손상된 hwpx 는 400, 파일이 남지 않는다
+    const broken = await http.post('/api/scripts').field('title', 'a').field('productionCompany', 'b').attach('file', Buffer.from('not zip'), { filename: 'a.hwpx' });
+    expect(broken.status).toBe(400);
     expect(readdirSync(storageDir)).toHaveLength(0);
   });
 

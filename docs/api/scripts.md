@@ -34,7 +34,7 @@
 
 | 필드 | 필수 | 설명 |
 |---|---|---|
-| `file` | O | `.txt` `.pdf` `.docx`. 최대 10MB |
+| `file` | O | `.txt` `.pdf` `.docx` `.hwpx`. 최대 10MB. 구버전 바이너리 `.hwp`는 미지원(한글에서 hwpx로 저장해 올릴 것) |
 | `title` | O | 작품명 (1~200자) |
 | `productionCompany` | O | 제작사 (1~200자) |
 | `shootStart` | | `YYYY-MM-DD` |

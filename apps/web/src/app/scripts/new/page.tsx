@@ -139,7 +139,7 @@ export default function NewScriptPage() {
               <span>~</span>
               <input type="date" className="inp" aria-label="촬영 종료일" value={end} min={start || undefined} aria-invalid={!!errors.period} onChange={(e) => setEnd(e.target.value)} />
             </div>
-            {errors.period ? <div className="err">{errors.period}</div> : <div className="help">알고 있다면 입력하세요. 비워 두면 대본에서 일정 단서를 찾아봅니다.</div>}
+            {errors.period ? <div className="err">{errors.period}</div> : <div className="help">알고 있다면 입력하세요. 비워 두면 대본에서 일정 단서를 찾아봅니다. 기간이 없으면 견적서 금액(일수)을 계산하지 못할 수 있으니, 가능하면 입력해 주세요.</div>}
           </div>
 
           <div className="form-foot">
