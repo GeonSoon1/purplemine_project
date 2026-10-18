@@ -24,7 +24,7 @@ import { ConfirmModal } from '@/components/Modal';
 import { VehiclePicker } from '@/components/VehiclePicker';
 import { useToast } from '@/components/Toast';
 
-type ItemDraft = Partial<Pick<QuoteItem, 'quantity' | 'endDate' | 'unitPrice' | 'extraAmount' | 'memo' | 'vehicleId'>>;
+type ItemDraft = Partial<Pick<QuoteItem, 'quantity' | 'startDate' | 'endDate' | 'unitPrice' | 'extraAmount' | 'memo' | 'vehicleId'>>;
 
 /** 저장 전에 화면에서만 추가한 항목의 임시 id 접두어 */
 const NEW = 'new-';
@@ -83,6 +83,7 @@ export default function QuoteDetailPage() {
   /** 차량을 바꾸면 서버가 새 차량의 현재 단가를 쓴다. 직접 고친 값이 있으면 그 값이 우선. */
   const baseUnit = (it: QuoteItem) => assigned[it.id]?.dailyRate ?? it.unitPrice;
   const unitOf = (it: QuoteItem) => itemDrafts[it.id]?.unitPrice ?? baseUnit(it);
+  const startOf = (it: QuoteItem) => (itemDrafts[it.id]?.startDate !== undefined ? itemDrafts[it.id].startDate! : it.startDate);
 
   // 화면 표시용 미리 계산. 저장하면 서버가 같은 규칙으로 다시 계산한 값으로 바뀐다.
   const preview = useMemo(() => {
@@ -91,7 +92,7 @@ export default function QuoteDetailPage() {
     let supply = 0;
     for (const it of rows) {
       const d = itemDrafts[it.id];
-      const days = daysBetween(it.startDate, d?.endDate !== undefined ? d.endDate : it.endDate);
+      const days = daysBetween(d?.startDate !== undefined ? d.startDate : it.startDate, d?.endDate !== undefined ? d.endDate : it.endDate);
       const unit = d?.unitPrice ?? assigned[it.id]?.dailyRate ?? it.unitPrice;
       const subtotal = unit * (d?.quantity ?? it.quantity) * (days ?? 0) + (d?.extraAmount ?? it.extraAmount);
       map.set(it.id, { days, subtotal });
@@ -255,9 +256,19 @@ export default function QuoteDetailPage() {
   const canRevert = idx > 0 && status !== 'SENT' && status !== 'CONFIRMED';
   const canSave = quote.isLatest && (!locked || dirtyCount > 0);
   const unassigned = rows.filter((it) => !vehicleOf(it)).length;
+  const noDays = rows.filter((it) => preview.rows.get(it.id)?.days == null);
+
+  /** 기간이 비어 일수를 계산하지 못한 항목에 견적서 촬영 기간을 채운다 (저장 때 같이 보낸다) */
+  function applyPeriod() {
+    if (!periodStart || !periodEnd) return;
+    for (const it of noDays) {
+      if (isNew(it.id)) setAdded((l) => l.map((x) => (x.id === it.id ? { ...x, startDate: periodStart, endDate: periodEnd } : x)));
+      else setItem(it.id, { startDate: periodStart, endDate: periodEnd });
+    }
+  }
   const outOfRange = (it: QuoteItem) => {
     const e = val(it, 'endDate');
-    return !!(periodStart && periodEnd && ((it.startDate && it.startDate < periodStart) || (e && e > periodEnd)));
+    return !!(periodStart && periodEnd && ((startOf(it) && startOf(it)! < periodStart) || (e && e > periodEnd)));
   };
 
   return (
@@ -310,6 +321,17 @@ export default function QuoteDetailPage() {
           </Banner>
         )}
         {unassigned > 0 && <Banner>차량을 정하지 못한 항목이 {unassigned}건 있습니다.</Banner>}
+        {noDays.length > 0 && (
+          <Banner
+            action={
+              !locked && periodStart && periodEnd ? <Button size="sm" onClick={applyPeriod}>견적서 기간 적용</Button> : undefined
+            }
+          >
+            {periodStart && periodEnd
+              ? `기간이 없는 항목 ${noDays.length}건은 일수를 계산하지 못해 금액이 0원으로 나옵니다.`
+              : `촬영 기간이 없어 항목 ${noDays.length}건의 금액을 계산하지 못했습니다(0원). 촬영 기간을 입력한 뒤 [견적서 기간 적용]을 눌러 주세요.`}
+          </Banner>
+        )}
         {errors.header && <Banner tone="bad">{errors.header}</Banner>}
 
         <div className="q-grid">
@@ -382,7 +404,8 @@ export default function QuoteDetailPage() {
                       const veh = vehicleOf(it);
                       const extra = val(it, 'extraAmount');
                       const itemMemo = val(it, 'memo');
-                      const period = fmtShortPeriod(it.startDate, val(it, 'endDate'));
+                      const start = startOf(it);
+                      const period = fmtShortPeriod(start, val(it, 'endDate'));
                       return (
                         <Fragment key={it.id}>
                           <tr id={`row-${it.id}`} className={pendingCls.trim() || undefined}>
@@ -401,11 +424,11 @@ export default function QuoteDetailPage() {
                                 className="cell"
                                 inputMode="numeric"
                                 aria-label="일수"
-                                disabled={locked || !it.startDate}
-                                title={it.startDate ? undefined : '기간이 없는 항목입니다'}
+                                disabled={locked || !start}
+                                title={start ? undefined : '기간이 없는 항목입니다. 위의 [견적서 기간 적용]으로 채울 수 있습니다.'}
                                 value={row.days ?? ''}
                                 onFocus={(e) => e.target.select()}
-                                onChange={(e) => it.startDate && setItem(it.id, { endDate: endFromDays(it.startDate, Math.max(1, digits(e.target.value))) })}
+                                onChange={(e) => start && setItem(it.id, { endDate: endFromDays(start, Math.max(1, digits(e.target.value))) })}
                               />
                             </td>
                             <td>
