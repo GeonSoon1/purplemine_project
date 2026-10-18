@@ -5,7 +5,8 @@ describe('script-file helpers', () => {
   it('확장자 판별(대소문자 무시), 미지원은 415', () => {
     expect(fileTypeOf('a.TXT')).toBe('txt');
     expect(fileTypeOf('대본.docx')).toBe('docx');
-    expect(() => fileTypeOf('a.hwp')).toThrow(UnsupportedMediaTypeException);
+    expect(fileTypeOf('대본.HWPX')).toBe('hwpx');
+    expect(() => fileTypeOf('a.hwp')).toThrow(UnsupportedMediaTypeException); // 구버전 바이너리 hwp 는 미지원
     expect(() => fileTypeOf('noext')).toThrow(UnsupportedMediaTypeException);
   });
   it('multer 의 latin1 파일명을 UTF-8 로 복원', () => {

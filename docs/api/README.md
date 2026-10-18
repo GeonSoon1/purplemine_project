@@ -81,3 +81,4 @@
 - v0.2 후보 매칭을 RAG 우선 + 규칙 기반 폴백으로 변경, 차량 등록/수정 시 설명 임베딩 자동 생성(실패해도 등록/수정은 성공). 응답 JSON 형태 변경 없음 (`score`/`reason` 값의 산출 방식만 달라짐).
 - v0.2.1 `GET /quotes/:id` 응답(및 견적서를 돌려주는 모든 응답)에 `isLatest` 추가. `PATCH /requirements/:id`에서 `vehicleType`만 바꾸면 `categoryHint`를 문구에서 다시 추정
 - v0.3 `POST /quotes/:id/save` 추가 (견적서 헤더 + 항목 추가/수정/삭제 일괄 저장, 트랜잭션)
+- v0.3.1 대본 업로드에 `.hwpx` 추가 (`fileType: "hwpx"`). 구버전 `.hwp`는 415

@@ -4,8 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import type { AppConfig } from '../config/app.config';
+import { extractHwpxText } from './hwpx';
 
-export const ALLOWED_EXTENSIONS = ['txt', 'pdf', 'docx'] as const;
+export const ALLOWED_EXTENSIONS = ['txt', 'pdf', 'docx', 'hwpx'] as const;
 export type ScriptFileType = (typeof ALLOWED_EXTENSIONS)[number];
 export const MAX_SCRIPT_BYTES = 10 * 1024 * 1024;
 export const MAX_SCRIPT_CHARS = 500_000;
@@ -13,7 +14,7 @@ export const MAX_SCRIPT_CHARS = 500_000;
 export const fileTypeOf = (originalName: string): ScriptFileType => {
   const ext = extname(originalName).slice(1).toLowerCase();
   if (!(ALLOWED_EXTENSIONS as readonly string[]).includes(ext)) {
-    throw new UnsupportedMediaTypeException('지원하지 않는 파일 형식입니다. txt, pdf, docx 만 올릴 수 있습니다.');
+    throw new UnsupportedMediaTypeException('지원하지 않는 파일 형식입니다. txt, pdf, docx, hwpx 만 올릴 수 있습니다.');
   }
   return ext as ScriptFileType;
 };
@@ -81,18 +82,24 @@ export class ScriptFileService {
         } finally {
           await parser.destroy();
         }
+      } else if (type === 'hwpx') {
+        text = await extractHwpxText(buffer);
       } else {
         const mammoth = await import('mammoth');
         text = (await mammoth.extractRawText({ buffer })).value;
       }
     } catch (e) {
       this.logger.warn(`텍스트 추출 실패(${type}): ${(e as Error).message}`);
-      throw new BadRequestException('파일에서 텍스트를 읽을 수 없습니다. 파일이 손상되었거나 스캔 이미지일 수 있습니다.');
+      throw new BadRequestException(
+        '파일에서 텍스트를 읽을 수 없습니다. 파일이 손상되었거나 스캔 이미지일 수 있습니다.',
+      );
     }
     text = text.replace(/\r\n?/g, '\n').trim();
     if (!text) throw new BadRequestException('파일에 읽을 수 있는 텍스트가 없습니다.');
     if (text.length > MAX_SCRIPT_CHARS) {
-      throw new BadRequestException(`대본이 너무 깁니다. 최대 ${MAX_SCRIPT_CHARS.toLocaleString('ko-KR')}자까지 분석할 수 있습니다.`);
+      throw new BadRequestException(
+        `대본이 너무 깁니다. 최대 ${MAX_SCRIPT_CHARS.toLocaleString('ko-KR')}자까지 분석할 수 있습니다.`,
+      );
     }
     return text;
   }
